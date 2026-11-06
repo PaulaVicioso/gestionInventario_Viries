@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}GdI - Formulario de Roles {% endblock %}</title>
+    <!-- Verifiquen que esté cambiado a Jinja--> 
+    <link rel="stylesheet" th:href="@{{url_for('static', filename='css/estilo.css')}}">
+    <!-- Conservar el Bootstrap?
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    --> 
+</head>
+
+    <body>
+        <!-- Verifiquen que esté cambiado a Jinja--> 
+        {% include 'fragments/navbar.html' %}      
+        <div style="max-width: 600px; margin: 30px auto; padding: 25px; border: 1px solid #ccc; border-radius: 8px; background-color: #ffffff;">
+                
+        <h2 class="mb-3">
+            <span class="alert alert-primary d-block text-center py-2" th:text="${rol.id == null ? 'Crear Nuevo Rol' : 'Editar Rol'}">Formulario de Rol</span>
+        </h2>
+
+        <p class="text-muted fs-6"> Complete el nombre del rol y marque las casillas de verificación correspondientes para asignarle los permisos requeridos dentro del sistema.</p>
+
+        <form th:action="@{/roles/guardar}" th:object="${rol}" method="post">
+            <input type="hidden" th:field="*{id}"/>
+
+            <div class="mb-3">
+                <label for="nombre" class="form-label fw-bold">Nombre del Rol:</label>
+                <input type="text" id="nombre" class="form-control" th:field="*{nombre}" required/>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold">Asignar Permisos:</label>
+                <p class="text-muted small mb-2">Seleccione los permisos que tendrá asignados este rol:</p>
+                        
+                <div class="border rounded p-3 bg-light" style="max-height: 200px; overflow-y: auto;">
+                    <div th:if="${#lists.isEmpty(permisos)}" class="text-muted fst-italic">
+                        No hay permisos registrados en el sistema para asignar.
+                    </div>
+                            
+                    <div class="form-check mb-2" th:each="permiso: ${permisos}">
+                        <input class="form-check-input"
+                            type="checkbox"
+                            name="permisoIds"
+                            th:id="${'permiso_' + permiso.id}"
+                            th:value="${permiso.id}"
+                            th:checked="${rol.permisos != null and rol.permisos.contains(permiso)}"/>
+                                <label class="form-check-label" th:for="${'permiso_' + permiso.id}">
+                                    <strong th:text="${permiso.codigo}">CODIGO</strong> 
+                                    <span th:if="${permiso.descripcion != null}" th:text="' - ' + ${permiso.descripcion}"></span>
+                                </label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-warning" type="submit">Guardar</button>
+                <button class="btn btn-danger" th:href="@{/roles}">Cancelar</button>
+            </div>
+        </form>
+    </div>
+        <div th:replace="~{fragments/footer :: footer}"></div>
+        <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    </body>
+</html>

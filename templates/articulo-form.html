@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}GdI - Formulario para artículos {% endblock %}</title>
+    <!-- Verifiquen que esté cambiado a Jinja--> 
+    <link rel="stylesheet" th:href="@{{url_for('static', filename='css/estilo.css')}}">
+    <!-- Conservar el Bootstrap?
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    --> 
+</head>
+
+<body>
+    <div th:replace="~{fragments/navbar :: navbar}"></div>
+
+    <div style="max-width: 600px; margin: 30px auto; padding: 20px; border: 1px solid #ccc; border-radius: 8px;">
+        <h2>
+            <span class="alert alert-info" th:if="${articulo instanceof T(com.example.model.Libro)}">Completar Libro</span>
+            <span class="alert alert-success" th:if="${articulo instanceof T(com.example.model.Cd)}">Completar  CD</span>
+            <span class="alert alert-warning" th:if="${articulo instanceof T(com.example.model.Pelicula)}">Completar Película</span>
+        </h2>
+
+        <form th:action="${articulo instanceof T(com.example.model.Libro)} ? @{/articulos/guardar/libro} : (${articulo instanceof T(com.example.model.Cd)} ? @{/articulos/guardar/cd} : @{/articulos/guardar/pelicula})"
+              th:object="${articulo}" method="post" enctype="multipart/form-data">
+
+            <input type="hidden" th:field="*{id}"/>
+
+            <div>
+                <label class="col-sm-2 col-form-label">Título:</label>
+                <input type="text" th:field="*{titulo}" required/>
+            </div>
+
+            <div>
+                <label class="col-sm-2 col-form-label">Autor:</label>
+                <input type="text" th:field="*{autor}" required/>
+            </div>
+
+            <div>
+                <label class="col-sm-2 col-form-label">Idioma:</label>
+                <input type="text" th:field="*{idioma}" required/>
+            </div>            
+            
+            <div>
+                <label class="col-sm-2 col-form-label">Año:</label>
+                <input type="number" th:field="*{anio}" required/>
+            </div>
+            
+            <div>
+                <label class="col-sm-2 col-form-label">Clasificación:</label>
+                <input type="text" th:field="*{clasificacion}"/>
+            </div>
+
+            <div>
+                <label class="col-sm-2 col-form-label">Precio:</label>
+                <input type="number" step="0.01" th:field="*{precio}" required/>
+            </div>
+
+            <div class="form-group">
+                <label class="col-sm-2 col-form-label">Promoción:</label>
+                <select th:field="*{promocion.id}" class="form-control">
+                    <option value="">Sin promo</option>
+                    <option th:each="promo : ${listaPromociones}" 
+                            th:value="${promo.id}" 
+                            th:text="${promo.porcentaje + '% de descuento'}">
+                    </option>
+                </select>
+            </div>
+
+            <div>
+                <label class="col-sm-2 col-form-label">Stock:</label>
+                <input type="number" th:field="*{stock}" required/>
+            </div>
+
+            <div>
+                <label class="col-sm-2 col-form-label">Imagen:</label>
+                <input type="file" name="imagenArchivo" accept="image/*"/>
+            </div>
+
+            <div class="alert alert-success" th:if="${articulo instanceof T(com.example.model.Cd)}">
+                    <div class="row">
+                        <div class="col-md-6 mb-2">
+                            <label class="form-label">Cant. Canciones:</label>
+                            <input type="number" class="form-control" name="canciones" th:value="${articulo instanceof T(com.example.model.Cd) ? articulo.canciones : 0}" required/>
+                        </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Duración total (min):</label>
+                            <input type="number" class="form-control" name="duracion" th:value="${articulo instanceof T(com.example.model.Cd) ? articulo.duracion : 0}" required/>
+                    </div>
+                    </div>
+            </div>
+
+            <div class="alert alert-info" th:if="${articulo instanceof T(com.example.model.Libro)}">
+                    <div class="row">
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Tipo de Tapa:</label>
+                            <input type="text" class="form-control" name="tapa" th:value="${articulo instanceof T(com.example.model.Libro) ? articulo.tapa : ''}" required/>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Total Hojas:</label>
+                            <input type="number" class="form-control" name="hojas" th:value="${articulo instanceof T(com.example.model.Libro) ? articulo.hojas : 0}" required/>
+                        </div>
+                        <div class="col-md-4 mb-2">
+                            <label class="form-label">Volúmenes:</label>
+                            <input type="number" class="form-control" name="volumen" th:value="${articulo instanceof T(com.example.model.Libro) ? articulo.volumen : 1}" required/>
+                        </div>
+                    </div>
+            </div>
+
+            <div class="alert alert-warning" th:if="${articulo instanceof T(com.example.model.Pelicula)}">
+                <div class="row">
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Formato:</label>
+                        <input type="text" class="form-control" name="formato" th:value="${articulo instanceof T(com.example.model.Pelicula) ? articulo.formato : ''}" required/>
+                    </div>
+                    <div class="col-md-6 mb-2">
+                        <label class="form-label">Duración total (min):</label>
+                        <input type="number" class="form-control" name="duracion" th:value="${articulo instanceof T(com.example.model.Pelicula) ? articulo.duracion : 0}" required/>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px;">
+                <button class="btn btn-warning" type="submit">Guardar</button>
+                <a class="btn btn-danger" th:href="@{/articulos}">Cancelar</a>
+            </div>          
+        </form>
+    </div>
+    <div th:replace="~{fragments/footer :: footer}"></div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

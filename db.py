@@ -1,3 +1,8 @@
+# el profe dijo que puede haber un LogIn
+# En las primeras clases habíamos visto condiciones para ser usuario o iniciar sesión
+# Podemos usar APIS ajenas de otros lados. Pero no reemplazar contenido que vimos nosotros en clase.
+# No usar SQL myAdmin
+
 import sqlite3
 
 def get_conexion():
