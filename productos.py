@@ -6,10 +6,14 @@
 # Hardcorear el Rol de ADMIN
 # El otro rol es de Cliente que es más limitado.
 
-from flask import render_template, Blueprint, request, redirect, url_for
+from flask import render_template, Blueprint, request, redirect, url_for, flash
 from db import get_conexion
+from auth import exigir_login
+
+TIPOS_ARTICULO = ("Libro", "Música", "Película")
 
 bp_productos = Blueprint("productos", __name__, url_prefix="/productos")
+bp_productos.before_request(exigir_login)
 
 
 @bp_productos.route("/")
@@ -29,14 +33,29 @@ def listaProductos():
 @bp_productos.route("/nuevo", methods=["GET", "POST"])
 def crear():
     if request.method == "POST":
-        nombre = request.form["nombre"]
-        autor = request.form["autor"]
+        nombre = request.form["nombre"].strip()
+        autor = request.form["autor"].strip()
         tipo_articulo = request.form["tipo_articulo"]
-        genero = request.form["genero"]
-        idioma = request.form["idioma"]
-        anio = int(request.form["anio"])
-        precio = float(request.form["precio"])
-        stock = int(request.form["stock"])
+        genero = request.form["genero"].strip()
+        idioma = request.form["idioma"].strip()
+
+        try:
+            anio = int(request.form["anio"])
+            precio = float(request.form["precio"])
+            stock = int(request.form["stock"])
+        except ValueError:
+            flash("Año, precio y stock deben ser números válidos")
+            return render_template("productos/crear.html"), 400
+
+        if not all([nombre, autor, genero, idioma]):
+            flash("Todos los campos son obligatorios")
+            return render_template("productos/crear.html"), 400
+        if tipo_articulo not in TIPOS_ARTICULO:
+            flash("Tipo de artículo inválido")
+            return render_template("productos/crear.html"), 400
+        if precio < 0 or stock < 0:
+            flash("El precio y el stock no pueden ser negativos")
+            return render_template("productos/crear.html"), 400
 
         conn = get_conexion()
         cursor = conn.cursor()
@@ -48,6 +67,7 @@ def crear():
         conn.commit()
         conn.close()
 
+        flash("Producto registrado correctamente")
         return redirect(url_for("productos.listaProductos"))
 
     return render_template("productos/crear.html")

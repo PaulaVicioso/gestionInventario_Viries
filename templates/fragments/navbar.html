@@ -36,7 +36,7 @@ CLIENTE puede ver, comprar con o sin promociones.
                             <a class="nav-link" th:href="@{/promociones}">Promociones</a>
                         </li>
                         <li class="nav-item" sec:authorize="hasRole('ADMINISTRADOR')">
-                            <a class="nav-link" th:href="@{/articulos}">Artículos</a>
+                            <a class="nav-link" href="{{ url_for('productos.listaProductos') }}">Artículos</a>
                         </li>
                         <li class="nav-item" sec:authorize="hasRole('ADMINISTRADOR')">
                             <a class="nav-link" th:href="@{/usuarios}">Usuarios</a>
