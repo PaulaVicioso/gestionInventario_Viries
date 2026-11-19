@@ -8,12 +8,10 @@
 
 from flask import render_template, Blueprint, request, redirect, url_for, flash
 from db import get_conexion
-from auth import exigir_login
 
 TIPOS_ARTICULO = ("Libro", "Música", "Película")
 
 bp_productos = Blueprint("productos", __name__, url_prefix="/productos")
-bp_productos.before_request(exigir_login)
 
 
 @bp_productos.route("/")

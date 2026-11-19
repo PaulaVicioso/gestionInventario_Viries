@@ -1,3 +1,4 @@
+import os
 from flask import Flask, render_template, request, redirect, url_for, flash
 from productos import bp_productos
 from carrito import bp_carrito
@@ -5,6 +6,8 @@ from werkzeug.security import generate_password_hash
 from db import create_tables
 
 app = Flask(__name__)
+# Necesaria para usar session y flash.
+app.secret_key = os.environ.get("SECRET_KEY", "dev-libreria-cambiar")
 
 app.register_blueprint(bp_productos)
 app.register_blueprint(bp_carrito)
