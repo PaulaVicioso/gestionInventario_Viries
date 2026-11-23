@@ -20,7 +20,7 @@ with app.app_context():
 # CRUD Create Read Update Delete → coso para recordar
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("home.html")
 
 @app.errorhandler(404)
 def pagina_noexiste(error):
@@ -37,4 +37,7 @@ if __name__ == "__main__":
 def nuevo_usuario():
     roles = [{'id': 1, 'nombre': 'Administrador'}, {'id': 2, 'nombre': 'Cliente'}]
     return render_template('usuario-form.html', roles=roles)
+
+
+
 # . . .

@@ -50,10 +50,18 @@
                     <td>{{ p.stock }}</td>
                     <td class="text-success fw-bold">${{ "%.2f"|format(p.precio) }}</td>
                     <td>
+
+                        <a href="{{ url_for('productos.editar', id_producto=p.id_producto) }}"
+                             class="btn btn-primary btn-sm">
+                            Editar
+                        </a>
                         <form method="post" action="{{ url_for('productos.eliminar', id_producto=p.id_producto) }}"
-                              onsubmit="return confirm('¿Seguro que deseas dar de baja este producto?');">
-                            <button type="submit" class="btn btn-danger btn-sm">Baja</button>
+                              onsubmit="return confirm('¿Seguro que deseas dar de baja este producto?');"
+                              style="display:inline;">
+        
+                              <button type="submit" class="btn btn-danger btn-sm">Baja</button>
                         </form>
+
                     </td>
                 </tr>
                 {% else %}

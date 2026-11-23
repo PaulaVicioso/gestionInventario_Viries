@@ -70,6 +70,67 @@ def crear():
 
     return render_template("productos/crear.html")
 
+@bp_productos.route("/editar/<int:id_producto>", methods=["GET", "POST"])
+def editar(id_producto):
+
+    conn = get_conexion()
+    cursor = conn.cursor()
+
+    if request.method == "POST":
+
+        nombre = request.form["nombre"].strip()
+        autor = request.form["autor"].strip()
+        tipo_articulo = request.form["tipo_articulo"]
+        genero = request.form["genero"].strip()
+        idioma = request.form["idioma"].strip()
+
+        anio = int(request.form["anio"])
+        precio = float(request.form["precio"])
+        stock = int(request.form["stock"])
+
+        cursor.execute("""
+            UPDATE producto
+            SET nombre = ?,
+                autor = ?,
+                tipo_articulo = ?,
+                genero = ?,
+                idioma = ?,
+                anio = ?,
+                precio = ?,
+                stock = ?
+            WHERE id_producto = ?
+        """, (
+            nombre,
+            autor,
+            tipo_articulo,
+            genero,
+            idioma,
+            anio,
+            precio,
+            stock,
+            id_producto
+        ))
+
+        conn.commit()
+        conn.close()
+
+        flash("Producto modificado correctamente")
+        return redirect(url_for("productos.listaProductos"))
+
+    cursor.execute(
+        "SELECT * FROM producto WHERE id_producto = ?",
+        (id_producto,)
+    )
+
+    producto = cursor.fetchone()
+
+    conn.close()
+
+    return render_template(
+        "productos/editar.html",
+        producto=producto
+    )
+
 @bp_productos.route("/eliminar/<int:id_producto>", methods=["POST"])
 def eliminar(id_producto):
     conn = get_conexion()
