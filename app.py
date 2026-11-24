@@ -5,7 +5,6 @@ from carrito import bp_carrito
 from werkzeug.security import generate_password_hash, check_password_hash
 from db import create_tables, get_conexion
 
-
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-libreria-cambiar")
 
@@ -26,6 +25,7 @@ ROLES_DEFAULT = [
 @app.route("/")
 def index():
     return render_template("home.html")
+
 
 @app.route("/usuarios/nuevo", methods=["GET"])
 def nuevo_usuario():
@@ -115,6 +115,7 @@ def guardar_usuario():
     finally:
         conn.close()
 
+
 @app.errorhandler(404)
 def pagina_noexiste(error):
     return render_template("404.html"), 404
@@ -122,6 +123,7 @@ def pagina_noexiste(error):
 @app.errorhandler(500)
 def error_interno(error):
     return render_template("500.html"), 500
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -156,4 +158,14 @@ def logout():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+''' GUARDADO POR LAS DUDAS AAAAA (°A°)
+@app.route('/usuarios/nuevo')
+def nuevo_usuario():
+    roles = [{'id': 1, 'nombre': 'Administrador'}, {'id': 2, 'nombre': 'Cliente'}]
+    return render_template('usuario-form.html', roles=roles)'''
+
+if __name__ == "__main__":
+    app.run(debug=True)
+
 # . . .

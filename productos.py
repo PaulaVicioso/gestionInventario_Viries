@@ -13,6 +13,9 @@ TIPOS_ARTICULO = ("Libro", "Música", "Película")
 
 bp_productos = Blueprint("productos", __name__, url_prefix="/productos")
 
+# Luego tenemos que unificar cómo llamarlos. 
+# ¿O lo dejamos así por si el potencial Usuario llega a escribir mal?
+# Nah creo que va a ser muy redundante. ¿Qué dicen?
 MAPEO_CATEGORIAS = {
     "lectura": "Libro",
     "libro": "Libro",
@@ -23,9 +26,57 @@ MAPEO_CATEGORIAS = {
     "película": "Película",
 }
 
+def es_administrador():
+    return session.get("rol_id") == 1
 
+def validar_producto(formulario):
+
+    nombre = formulario.get("nombre", "").strip()
+    autor = formulario.get("autor", "").strip()
+    tipo_articulo = formulario.get("tipo_articulo", "").strip()
+    genero = formulario.get("genero", "").strip()
+    idioma = formulario.get("idioma", "").strip()
+
+    if not all([nombre, autor, tipo_articulo, genero, idioma]):
+        return None, "Todos los campos son obligatorios."
+
+    if tipo_articulo not in TIPOS_ARTICULO:
+        return None, "El tipo de artículo seleccionado no es válido."
+
+    try:
+        anio = int(formulario.get("anio", ""))
+        precio = float(formulario.get("precio", ""))
+        stock = int(formulario.get("stock", ""))
+    except (ValueError, TypeError):
+        return None, "Año, precio y stock deben ser números válidos."
+
+    if anio <= 0:
+        return None, "El año debe ser mayor que cero."
+
+    if precio < 0:
+        return None, "El precio no puede ser negativo."
+
+    if stock < 0:
+        return None, "El stock no puede ser negativo."
+
+    datos = (
+        nombre,
+        autor,
+        tipo_articulo,
+        genero,
+        idioma,
+        anio,
+        precio,
+        stock
+    )
+
+    return datos, None
+
+
+# LISTADO DE PRODUCTOS
 @bp_productos.route("/")
 def listaProductos():
+
     categoria_param = request.args.get("categoria", "").strip().lower()
     tipo_filtro = MAPEO_CATEGORIAS.get(categoria_param)
 
@@ -33,7 +84,10 @@ def listaProductos():
     cursor = conn.cursor()
 
     if tipo_filtro:
-        cursor.execute("SELECT * FROM producto WHERE LOWER(tipo_articulo) = LOWER(?)", (tipo_filtro,))
+        cursor.execute(
+            "SELECT * FROM producto WHERE tipo_articulo = ?",
+            (tipo_filtro,)
+        )
     else:
         cursor.execute("SELECT * FROM producto")
 
@@ -43,64 +97,137 @@ def listaProductos():
     return render_template(
         "productos/lista.html",
         productos=productos,
-        categoria_actual=categoria_param,
+        categoria_actual=categoria_param
     )
 
+
+# ALTA DE PRODUCTOS
 @bp_productos.route("/nuevo", methods=["GET", "POST"])
 def crear():
-    if session.get("rol_id") != 1:
-        flash("Acceso denegado: solo el Administrador puede dar de alta o baja productos.", "danger")
+
+    if not es_administrador():
+        flash(
+            "Acceso denegado: solo el Administrador puede dar de alta productos.",
+            "danger"
+        )
         return redirect(url_for("productos.listaProductos"))
 
     if request.method == "POST":
-        nombre = request.form["nombre"].strip()
-        autor = request.form["autor"].strip()
-        tipo_articulo = request.form["tipo_articulo"]
-        genero = request.form["genero"].strip()
-        idioma = request.form["idioma"].strip()
 
-        try:
-            anio = int(request.form["anio"])
-            precio = float(request.form["precio"])
-            stock = int(request.form["stock"])
-        except ValueError:
-            flash("Año, precio y stock deben ser números válidos")
-            return render_template("productos/crear.html"), 400
+        datos, error = validar_producto(request.form)
 
-        if not all([nombre, autor, genero, idioma]):
-            flash("Todos los campos son obligatorios")
-            return render_template("productos/crear.html"), 400
-        if tipo_articulo not in TIPOS_ARTICULO:
-            flash("Tipo de artículo inválido")
-            return render_template("productos/crear.html"), 400
-        if precio < 0 or stock < 0:
-            flash("El precio y el stock no pueden ser negativos")
+        if error:
+            flash(error, "danger")
             return render_template("productos/crear.html"), 400
 
         conn = get_conexion()
         cursor = conn.cursor()
+
         cursor.execute("""
-            INSERT INTO producto (nombre, autor, tipo_articulo, genero, idioma, anio, precio, stock)
+            INSERT INTO producto
+            (nombre, autor, tipo_articulo, genero, idioma, anio, precio, stock)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (nombre, autor, tipo_articulo, genero, idioma, anio, precio, stock))
+        """, datos)
 
         conn.commit()
         conn.close()
 
-        flash("Producto registrado correctamente")
+        flash("Producto registrado correctamente.", "success")
         return redirect(url_for("productos.listaProductos"))
+
     return render_template("productos/crear.html")
 
-@bp_productos.route("/eliminar/<int:id_producto>", methods=["POST"])
-def eliminar(id_producto):
-    if session.get("rol_id") != 1:
-        flash("Acceso denegado: solo el Administrador puede dar de alta o baja productos.", "danger")
+
+# EDICIÓN DE PRODUCTOS
+@bp_productos.route("/editar/<int:id_producto>", methods=["GET", "POST"])
+def editar(id_producto):
+
+    if not es_administrador():
+        flash(
+            "Acceso denegado: solo el Administrador puede modificar productos.",
+            "danger"
+        )
         return redirect(url_for("productos.listaProductos"))
 
     conn = get_conexion()
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM producto WHERE id_producto = ?", (id_producto,))
+
+    cursor.execute(
+        "SELECT * FROM producto WHERE id_producto = ?",
+        (id_producto,)
+    )
+
+    producto = cursor.fetchone()
+
+    if producto is None:
+        conn.close()
+        flash("El producto que intentás editar no existe.", "danger")
+        return redirect(url_for("productos.listaProductos"))
+
+    if request.method == "POST":
+
+        datos, error = validar_producto(request.form)
+
+        if error:
+            conn.close()
+            flash(error, "danger")
+            return render_template(
+                "productos/editar.html",
+                producto=producto
+            ), 400
+
+        cursor.execute("""
+            UPDATE producto
+            SET nombre = ?,
+                autor = ?,
+                tipo_articulo = ?,
+                genero = ?,
+                idioma = ?,
+                anio = ?,
+                precio = ?,
+                stock = ?
+            WHERE id_producto = ?
+        """, datos + (id_producto,))
+
+        conn.commit()
+        conn.close()
+
+        flash("Producto modificado correctamente.", "success")
+        return redirect(url_for("productos.listaProductos"))
+
+    conn.close()
+
+    return render_template(
+        "productos/editar.html",
+        producto=producto
+    )
+
+@bp_productos.route("/eliminar/<int:id_producto>", methods=["POST"])
+def eliminar(id_producto):
+
+    if not es_administrador():
+        flash(
+            "Acceso denegado: solo el Administrador puede dar de baja productos.",
+            "danger"
+        )
+        return redirect(url_for("productos.listaProductos"))
+
+    conn = get_conexion()
+    cursor = conn.cursor()
+
+    cursor.execute(
+        "DELETE FROM producto WHERE id_producto = ?",
+        (id_producto,)
+    )
+
+    eliminado = cursor.rowcount
+
     conn.commit()
     conn.close()
+
+    if eliminado:
+        flash("Producto dado de baja correctamente.", "success")
+    else:
+        flash("No se encontró el producto que intentabas eliminar.", "warning")
 
     return redirect(url_for("productos.listaProductos"))
