@@ -18,8 +18,13 @@
                 <div class="alert alert-success" role="alert">{{ m }}</div>
             {% endfor %}
         {% endwith %}
-        <a class="btn btn-warning" href="{{ url_for('productos.crear') }}">Dar de alta producto</a>
-        <hr>
+        <a class="btn btn-warning" href="{{ url_for('productos.crear') }}">
+            Dar de alta producto
+        </a>
+
+        <a class="btn btn-secondary" href="{{ url_for('index') }}">
+           Volver al inicio
+        </a>
 
         <table class="table table-striped align-middle">
             <thead class="table-primary">

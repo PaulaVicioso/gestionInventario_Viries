@@ -30,13 +30,14 @@ def pagina_noexiste(error):
 def error_interno(error):
     return render_template("500.html"), 500
 
-if __name__ == "__main__":
-    app.run(debug=True)
 
 @app.route('/usuarios/nuevo')
 def nuevo_usuario():
     roles = [{'id': 1, 'nombre': 'Administrador'}, {'id': 2, 'nombre': 'Cliente'}]
     return render_template('usuario-form.html', roles=roles)
+
+if __name__ == "__main__":
+    app.run(debug=True)
 
 
 
