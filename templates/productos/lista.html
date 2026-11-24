@@ -9,16 +9,37 @@
 </head>
 
 <body>
+    {% include 'fragments/navbar.html' %}
+
     <div class="container mt-5">
 
         <h2>Listado de productos</h2>
 
-        {% with mensajes = get_flashed_messages() %}
-            {% for m in mensajes %}
-                <div class="alert alert-success" role="alert">{{ m }}</div>
-            {% endfor %}
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category else 'info' }}" role="alert">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
         {% endwith %}
-        <a class="btn btn-warning" href="{{ url_for('productos.crear') }}">Dar de alta producto</a>
+
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 my-3">
+            {% if session.get("rol_id") == 1 %}
+                <a class="btn btn-warning" href="{{ url_for('productos.crear') }}">Dar de alta producto</a>
+            {% endif %}
+
+            <div class="btn-group" role="group" aria-label="Categorías">
+                <a href="{{ url_for('productos.listaProductos') }}"
+                   class="btn btn-outline-primary {% if not categoria_actual %}active{% endif %}">Todos</a>
+                <a href="{{ url_for('productos.listaProductos', categoria='lectura') }}"
+                   class="btn btn-outline-primary {% if categoria_actual == 'lectura' %}active{% endif %}">Libros</a>
+                <a href="{{ url_for('productos.listaProductos', categoria='musica') }}"
+                   class="btn btn-outline-primary {% if categoria_actual == 'musica' %}active{% endif %}">Música</a>
+                <a href="{{ url_for('productos.listaProductos', categoria='video') }}"
+                   class="btn btn-outline-primary {% if categoria_actual == 'video' %}active{% endif %}">Audiovisual</a>
+                <!-- ¿Dejar Video o Audiovisual?-->
+            </div>
+        </div>
         <hr>
 
         <table class="table table-striped align-middle">
@@ -50,19 +71,35 @@
                     <td>{{ p.stock }}</td>
                     <td class="text-success fw-bold">${{ "%.2f"|format(p.precio) }}</td>
                     <td>
-                        <form method="post" action="{{ url_for('productos.eliminar', id_producto=p.id_producto) }}"
-                              onsubmit="return confirm('¿Seguro que deseas dar de baja este producto?');">
-                            <button type="submit" class="btn btn-danger btn-sm">Baja</button>
-                        </form>
+                        <div class="d-flex gap-2">
+
+                            <form method="post" action="{{ url_for('carrito.comprar_ahora', id_producto=p.id_producto) }}">
+                                <button type="submit" class="btn btn-success btn-sm" {% if p.stock <= 0 %}disabled{% endif %}>
+                                    Comprar
+                                </button>
+                            </form>
+
+                            <form method="post" action="{{ url_for('productos.eliminar', id_producto=p.id_producto) }}"
+                                  onsubmit="return confirm('¿Seguro que deseas dar de baja este producto?');">
+                                {% if session.get("rol_id") == 1 %}
+                                    <form method="post" action="{{ url_for('productos.eliminar', id_producto=p.id_producto) }}"
+                                        onsubmit="return confirm('¿Seguro que deseas dar de baja este producto?');">
+                                        <button type="submit" class="btn btn-danger btn-sm">Baja</button>
+                                    </form>
+                                {% endif %}
+                            </form>
+                        </div>
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="10" class="text-center text-muted">No hay productos cargados.</td>
+                    <td colspan="10" class="text-center text-muted">Ahora no hay productos cargados en esta categoría.</td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    {% include 'fragments/footer.html' %}
 </body>
 </html>

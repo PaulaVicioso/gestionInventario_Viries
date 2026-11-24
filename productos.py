@@ -6,30 +6,52 @@
 # Hardcorear el Rol de ADMIN
 # El otro rol es de Cliente que es más limitado.
 
-from flask import render_template, Blueprint, request, redirect, url_for, flash
+from flask import render_template, Blueprint, request, redirect, url_for, flash, session
 from db import get_conexion
 
 TIPOS_ARTICULO = ("Libro", "Música", "Película")
 
 bp_productos = Blueprint("productos", __name__, url_prefix="/productos")
 
+MAPEO_CATEGORIAS = {
+    "lectura": "Libro",
+    "libro": "Libro",
+    "musica": "Música",
+    "música": "Música",
+    "video": "Película",
+    "pelicula": "Película",
+    "película": "Película",
+}
+
 
 @bp_productos.route("/")
 def listaProductos():
+    categoria_param = request.args.get("categoria", "").strip().lower()
+    tipo_filtro = MAPEO_CATEGORIAS.get(categoria_param)
+
     conn = get_conexion()
-    
     cursor = conn.cursor()
-    cursor.execute("""
-                   SELECT * FROM producto
-                   """)
-    
+
+    if tipo_filtro:
+        cursor.execute("SELECT * FROM producto WHERE LOWER(tipo_articulo) = LOWER(?)", (tipo_filtro,))
+    else:
+        cursor.execute("SELECT * FROM producto")
+
     productos = cursor.fetchall()
     conn.close()
-    
-    return render_template("productos/lista.html", productos = productos)
+
+    return render_template(
+        "productos/lista.html",
+        productos=productos,
+        categoria_actual=categoria_param,
+    )
 
 @bp_productos.route("/nuevo", methods=["GET", "POST"])
 def crear():
+    if session.get("rol_id") != 1:
+        flash("Acceso denegado: solo el Administrador puede dar de alta o baja productos.", "danger")
+        return redirect(url_for("productos.listaProductos"))
+
     if request.method == "POST":
         nombre = request.form["nombre"].strip()
         autor = request.form["autor"].strip()
@@ -67,11 +89,14 @@ def crear():
 
         flash("Producto registrado correctamente")
         return redirect(url_for("productos.listaProductos"))
-
     return render_template("productos/crear.html")
 
 @bp_productos.route("/eliminar/<int:id_producto>", methods=["POST"])
 def eliminar(id_producto):
+    if session.get("rol_id") != 1:
+        flash("Acceso denegado: solo el Administrador puede dar de alta o baja productos.", "danger")
+        return redirect(url_for("productos.listaProductos"))
+
     conn = get_conexion()
     cursor = conn.cursor()
     cursor.execute("DELETE FROM producto WHERE id_producto = ?", (id_producto,))
