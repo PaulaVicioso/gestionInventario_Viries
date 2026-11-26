@@ -32,6 +32,7 @@ CLIENTE puede ver, comprar con o sin promociones.
         <section class="d-flex align-items-center ms-auto gap-2">
             {% if session.get("usuario_id") %}
                 <span class="text-white small me-1">Hola, {{ session.get("usuario_nombre") }}</span>
+                <a href="{{ url_for('usuarios.mi_perfil') }}" class="btn btn-outline-light btn-sm">Mi perfil</a>
                 <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm text-warning fw-semibold">Cerrar sesión</a>
             {% else %}
                 <a href="{{ url_for('usuarios.nuevo_usuario') }}" class="btn btn-warning btn-sm text-dark fw-semibold">Registrate</a>
