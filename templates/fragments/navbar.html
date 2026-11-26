@@ -1,49 +1,25 @@
-<!--
-ADMINISTRADOR es el encargado del ingreso de los Usuarios, Artículo, Precios y Promociones
-CAJERO tiene el control de los pagos y entrega de artículos.
-CLIENTE puede ver, comprar con o sin promociones.
--->
-<nav class="navbar navbar-dark bg-primary shadow-sm mb-0 py-2">
-    <div class="container-fluid flex-wrap flex-sm-nowrap">
-        <a class="navbar-brand d-flex align-items-center gap-2 fw-bold text-info" href="{{ url_for('index') }}">
-            <img src="{{ url_for('static', filename='imagenes/logoLibreria.png') }}" alt="Logo" width="30" height="30" class="d-inline-block align-text-top rounded">
-            <span>Libreria Multimedia</span>
-        </a>
-
-        <div class="d-flex justify-content-center align-items-center mx-auto" id="navbarNav">
-            <ul class="navbar-nav flex-row gap-3 mb-0 p-0">
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('index') }}">Home</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('productos.listaProductos') }}">Artículos</a>
-                </li>
-                {% if session.get('usuario_id') %}
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('carrito.visualizarCarrito') }}">Mis compras</a>
-                </li>
-                {% endif %}
-                {% if not session.get("usuario_id") %}
-                <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('login') }}">Inicia sesión</a>
-                </li>
-                {% endif %}
-            </ul>
-        </div>
-
-        <section class="d-flex align-items-center ms-auto gap-2">
-            {% if session.get("usuario_id") %}
-                <span class="text-white small me-1">Hola, {{ session.get("usuario_nombre") }}</span>
-                <a href="{{ url_for('usuarios.mi_perfil') }}" class="btn btn-outline-light btn-sm">Mi perfil</a>
-                <a href="{{ url_for('productos.mis_reservas') }}" class="btn btn-outline-light btn-sm">Mis reservas</a>
+<header class="masthead">
+    <div class="shell masthead-inner">
+        <a class="wordmark" href="{{ url_for('index') }}">Viries<span>.</span></a>
+        <nav aria-label="Navegación principal">
+            {% for endpoint, label in [('index', 'Inicio'), ('productos.listaProductos', 'Catálogo'), ('carrito.visualizarCarrito', 'Mis compras')] if endpoint != 'carrito.visualizarCarrito' or session.get('usuario_id') %}
+                <a href="{{ url_for(endpoint) }}"{% if request.endpoint == endpoint %} aria-current="page"{% endif %}>{{ label }}</a>
+            {% endfor %}
+        </nav>
+        <div class="account">
+            {% if session.get('usuario_id') %}
+                <span>Hola, {{ session.get('usuario_nombre') }}</span>
+                <a href="{{ url_for('usuarios.mi_perfil') }}">Mi perfil</a>
+                <a href="{{ url_for('productos.mis_reservas') }}"{% if request.endpoint == 'productos.mis_reservas' %} aria-current="page"{% endif %}>Mis reservas</a>
                 {% if session.get('rol_id') == 1 %}
-                    <a href="{{ url_for('carrito.listar_ventas') }}" class="btn btn-outline-light btn-sm">Ventas</a>
-                    <a href="{{ url_for('productos.listar_reservas') }}" class="btn btn-outline-light btn-sm">Reservas</a>
+                    <a href="{{ url_for('carrito.listar_ventas') }}"{% if request.endpoint == 'carrito.listar_ventas' %} aria-current="page"{% endif %}>Ventas</a>
+                    <a href="{{ url_for('productos.listar_reservas') }}"{% if request.endpoint == 'productos.listar_reservas' %} aria-current="page"{% endif %}>Reservas</a>
                 {% endif %}
-                <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm text-warning fw-semibold">Cerrar sesión</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('logout') }}">Cerrar sesión</a>
             {% else %}
-                <a href="{{ url_for('usuarios.nuevo_usuario') }}" class="btn btn-warning btn-sm text-dark fw-semibold">Registrate</a>
+                <a href="{{ url_for('login') }}">Iniciar sesión</a>
+                <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('usuarios.nuevo_usuario') }}">Registrate</a>
             {% endif %}
-        </section>
+        </div>
     </div>
-</nav>
+</header>
