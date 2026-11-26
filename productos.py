@@ -68,11 +68,14 @@ def validar_producto(formulario):
     if stock < 0:
         return None, "El stock no puede ser negativo."
 
+    edad_minima = edad_maxima = None
     try:
-        edad_minima = edad_opcional(formulario.get("edad_minima", ""))
-        edad_maxima = edad_opcional(formulario.get("edad_maxima", ""))
+        if tipo_articulo in ("Libro", "Película"):
+            edad_minima = edad_opcional(formulario.get("edad_minima", ""))
+        if tipo_articulo == "Libro":
+            edad_maxima = edad_opcional(formulario.get("edad_maxima", ""))
     except ValueError:
-        return None, "Las edades recomendadas deben ser enteras y no negativas."
+        return None, "Las edades deben ser enteras y no negativas."
 
     if edad_minima is not None and edad_maxima is not None and edad_minima > edad_maxima:
         return None, "La edad mínima no puede superar la máxima."

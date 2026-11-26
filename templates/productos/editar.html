@@ -137,13 +137,14 @@
             </div>
 
             <fieldset class="row">
-                <legend class="fs-6">Rango de edad recomendado</legend>
+                <legend class="fs-6">Edades y clasificación</legend>
+                <p class="form-text">Para libros, indicá el rango recomendado. Para películas, cargá solo la edad mínima de la clasificación de la edición. Para música, dejá ambos campos vacíos.</p>
                 <div class="col-md-6 mb-3">
                     <label for="edad_minima" class="form-label">Edad mínima (opcional)</label>
                     <input type="number" min="0" class="form-control" id="edad_minima" name="edad_minima" value="{{ request.form.get('edad_minima', producto.edad_minima if producto.edad_minima is not none else '') }}">
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label for="edad_maxima" class="form-label">Edad máxima (opcional)</label>
+                    <label for="edad_maxima" class="form-label">Edad máxima, solo libros (opcional)</label>
                     <input type="number" min="0" class="form-control" id="edad_maxima" name="edad_maxima" value="{{ request.form.get('edad_maxima', producto.edad_maxima if producto.edad_maxima is not none else '') }}">
                 </div>
             </fieldset>

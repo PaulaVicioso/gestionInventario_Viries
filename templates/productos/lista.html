@@ -54,14 +54,14 @@
                 </a>
                 <a href="{{ url_for('productos.listaProductos', categoria='video') }}"
                    class="btn btn-outline-primary {% if categoria_actual == 'video' %}active{% endif %}">
-                    Video
+                    Película
                 </a>
             </div>
         </div>
             <form method="get" action="{{ url_for('productos.listaProductos') }}" class="row g-3 align-items-end">
                 <input type="hidden" name="categoria" value="lectura">
                 <div class="col-sm-5 col-lg-3">
-                    <label for="edad" class="form-label fw-semibold">Edad recomendada (años)</label>
+                    <label for="edad" class="form-label fw-semibold">Edad recomendada para libros (años)</label>
                     <input type="number" min="0" class="form-control" id="edad" name="edad" value="{{ edad }}">
                 </div>
                 <div class="col-sm-7 col-lg-4">
@@ -91,7 +91,7 @@
                         <th scope="col">Género:</th>
                         <th scope="col">Idioma:</th>
                         <th scope="col">Año:</th>
-                        <th scope="col">Rango de edad recomendado</th>
+                        <th scope="col">Edad recomendada o clasificación</th>
                         <th scope="col">Stock:</th>
                         <th scope="col">Precio:</th>
                         <th scope="col">Acciones:</th>
@@ -110,14 +110,17 @@
                         <td>{{ p.idioma }}</td>
                         <td>{{ p.anio }}</td>
                         <td>
-                            {% if p.edad_minima is not none and p.edad_maxima is not none %}
-                                {{ p.edad_minima }} a {{ p.edad_maxima }} años
-                            {% elif p.edad_minima is not none %}
-                                Desde {{ p.edad_minima }} años
-                            {% elif p.edad_maxima is not none %}
-                                Hasta {{ p.edad_maxima }} años
-                            {% else %}
-                                —
+                            {% if p.tipo_articulo == 'Película' and p.edad_minima is not none %}
+                                <span class="d-block fw-semibold">Clasificación por edades</span>
+                                {{ 'Apta para todo público' if p.edad_minima == 0 else p.edad_minima ~ '+' }}
+                            {% elif p.tipo_articulo == 'Libro' %}
+                                {% if p.edad_minima is not none and p.edad_maxima is not none %}
+                                    {{ p.edad_minima }} a {{ p.edad_maxima }} años
+                                {% elif p.edad_minima is not none %}
+                                    Desde {{ p.edad_minima }} años
+                                {% elif p.edad_maxima is not none %}
+                                    Hasta {{ p.edad_maxima }} años
+                                {% endif %}
                             {% endif %}
                         </td>
                         <td>
