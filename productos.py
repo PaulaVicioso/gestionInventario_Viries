@@ -6,7 +6,7 @@
 # Hardcorear el Rol de ADMIN
 # El otro rol es de Cliente que es más limitado.
 
-from flask import render_template, Blueprint, request, redirect, url_for, flash, session
+from flask import abort, render_template, Blueprint, request, redirect, url_for, flash, session
 from db import get_conexion
 
 TIPOS_ARTICULO = ("Libro", "Música", "Película")
@@ -183,6 +183,70 @@ def reservar(id_producto):
 
     filtros = {clave: request.args[clave] for clave in ("categoria", "edad", "genero") if clave in request.args}
     return redirect(url_for("productos.listaProductos", **filtros))
+
+
+@bp_productos.route("/mis-reservas")
+def mis_reservas():
+    usuario_id = session.get("usuario_id")
+    if usuario_id is None:
+        return redirect(url_for("login"))
+
+    conn = get_conexion()
+    try:
+        reservas = conn.execute("""
+            SELECT p.nombre AS libro, r.id_producto, r.fecha_creacion
+            FROM reserva r
+            JOIN producto p ON p.id_producto = r.id_producto
+            WHERE r.usuario_id = ?
+            ORDER BY r.fecha_creacion, r.rowid
+        """, (usuario_id,)).fetchall()
+    finally:
+        conn.close()
+    return render_template("productos/reservas.html", reservas=reservas, administracion=False)
+
+
+@bp_productos.route("/mis-reservas/<int:id_producto>/cancelar", methods=["POST"])
+def cancelar_reserva(id_producto):
+    usuario_id = session.get("usuario_id")
+    if usuario_id is None:
+        return redirect(url_for("login"))
+
+    conn = get_conexion()
+    try:
+        with conn:
+            canceladas = conn.execute("""
+                DELETE FROM reserva WHERE usuario_id = ? AND id_producto = ?
+            """, (usuario_id, id_producto)).rowcount
+    finally:
+        conn.close()
+
+    if canceladas:
+        flash("Reserva cancelada.", "success")
+    else:
+        flash("No tenés una reserva pendiente para ese libro.", "info")
+    return redirect(url_for("productos.mis_reservas"))
+
+
+@bp_productos.route("/reservas")
+def listar_reservas():
+    if session.get("usuario_id") is None:
+        return redirect(url_for("login"))
+    if not es_administrador():
+        abort(403)
+
+    conn = get_conexion()
+    try:
+        reservas = conn.execute("""
+            SELECT p.nombre AS libro, u.nombre, u.apellido, u.email, r.fecha_creacion,
+                   COUNT(*) OVER (PARTITION BY r.id_producto) AS pendientes
+            FROM reserva r
+            JOIN producto p ON p.id_producto = r.id_producto
+            JOIN usuario u ON u.id = r.usuario_id
+            ORDER BY r.fecha_creacion, r.rowid
+        """).fetchall()
+    finally:
+        conn.close()
+    return render_template("productos/reservas.html", reservas=reservas, administracion=True)
 
 
 # ALTA DE PRODUCTOS
