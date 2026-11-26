@@ -1,9 +1,17 @@
-from flask import render_template, Blueprint, redirect, url_for, flash
+from flask import render_template, Blueprint, redirect, url_for, flash, request, session
 from db import get_conexion
 #Acá nostoros vamos a crear el BLUEPRINT
 bp_carrito = Blueprint("carrito", __name__, url_prefix="/carrito")
 
 MI_CARRITO = []
+
+@bp_carrito.before_request
+def requerir_sesion():
+    if session.get("usuario_id") is None:
+        if request.endpoint == "carrito.comprar_ahora":
+            flash("Para comprar, primero iniciá sesión.", "warning")
+        return redirect(url_for("login"))
+
 
 @bp_carrito.route("/")
 def visualizarCarrito():
