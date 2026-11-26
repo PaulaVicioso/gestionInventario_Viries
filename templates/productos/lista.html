@@ -58,6 +58,25 @@
                 </a>
             </div>
         </div>
+            <form method="get" action="{{ url_for('productos.listaProductos') }}" class="row g-3 align-items-end">
+                <input type="hidden" name="categoria" value="lectura">
+                <div class="col-sm-5 col-lg-3">
+                    <label for="edad" class="form-label fw-semibold">Edad recomendada (años)</label>
+                    <input type="number" min="0" class="form-control" id="edad" name="edad" value="{{ edad }}">
+                </div>
+                <div class="col-sm-7 col-lg-4">
+                    <label for="genero" class="form-label fw-semibold">Género o tema del libro</label>
+                    <select class="form-select" id="genero" name="genero">
+                        <option value="">Todos los géneros</option>
+                        {% for opcion in generos %}
+                            <option value="{{ opcion.genero }}" {% if genero == opcion.genero %}selected{% endif %}>{{ opcion.genero }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-lg-auto d-flex flex-wrap gap-2">
+                    <button type="submit" class="btn btn-primary">Filtrar libros</button>
+                </div>
+            </form>
         <hr>
         <div class="table-responsive">
             <table class="table table-striped align-middle">
@@ -71,6 +90,7 @@
                         <th scope="col">Género:</th>
                         <th scope="col">Idioma:</th>
                         <th scope="col">Año:</th>
+                        <th scope="col">Rango de edad recomendado</th>
                         <th scope="col">Stock:</th>
                         <th scope="col">Precio:</th>
                         <th scope="col">Acciones:</th>
@@ -88,6 +108,17 @@
                         <td>{{ p.genero }}</td>
                         <td>{{ p.idioma }}</td>
                         <td>{{ p.anio }}</td>
+                        <td>
+                            {% if p.edad_minima is not none and p.edad_maxima is not none %}
+                                {{ p.edad_minima }} a {{ p.edad_maxima }} años
+                            {% elif p.edad_minima is not none %}
+                                Desde {{ p.edad_minima }} años
+                            {% elif p.edad_maxima is not none %}
+                                Hasta {{ p.edad_maxima }} años
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
                         <td>{{ p.stock }}</td>
 
                         <td class="text-success fw-bold">
@@ -131,8 +162,8 @@
 
                     {% else %}
                     <tr>
-                        <td colspan="10" class="text-center text-muted">
-                            Ahora no hay productos cargados en esta categoría.
+                        <td colspan="11" class="text-center text-muted">
+                            {% if edad or genero %}No hay libros que coincidan con los filtros seleccionados.{% else %}Ahora no hay productos cargados en esta categoría.{% endif %}
                         </td>
                     </tr>
                     {% endfor %}

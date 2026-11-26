@@ -29,6 +29,15 @@ MAPEO_CATEGORIAS = {
 def es_administrador():
     return session.get("rol_id") == 1
 
+def edad_opcional(valor):
+    if not valor.strip():
+        return None
+    edad = int(valor)
+    if not 0 <= edad <= 2**63 - 1:
+        raise ValueError("Edad fuera de rango")
+    return edad
+
+
 def validar_producto(formulario):
 
     nombre = formulario.get("nombre", "").strip()
@@ -59,6 +68,15 @@ def validar_producto(formulario):
     if stock < 0:
         return None, "El stock no puede ser negativo."
 
+    try:
+        edad_minima = edad_opcional(formulario.get("edad_minima", ""))
+        edad_maxima = edad_opcional(formulario.get("edad_maxima", ""))
+    except ValueError:
+        return None, "Las edades recomendadas deben ser enteras y no negativas."
+
+    if edad_minima is not None and edad_maxima is not None and edad_minima > edad_maxima:
+        return None, "La edad mínima no puede superar la máxima."
+
     datos = (
         nombre,
         autor,
@@ -67,7 +85,9 @@ def validar_producto(formulario):
         idioma,
         anio,
         precio,
-        stock
+        stock,
+        edad_minima,
+        edad_maxima,
     )
 
     return datos, None
@@ -80,24 +100,51 @@ def listaProductos():
     categoria_param = request.args.get("categoria", "").strip().lower()
     tipo_filtro = MAPEO_CATEGORIAS.get(categoria_param)
 
-    conn = get_conexion()
-    cursor = conn.cursor()
+    edad_texto = request.args.get("edad", "").strip()
+    genero = request.args.get("genero", "").strip()
+    try:
+        edad = edad_opcional(edad_texto)
+    except ValueError:
+        flash("Ingresá una edad entera y no negativa.", "warning")
+        return redirect(url_for("productos.listaProductos", categoria=categoria_param, genero=genero))
 
+    condiciones = []
+    parametros = []
+    if edad is not None or genero:
+        tipo_filtro = "Libro"
+        categoria_param = "lectura"
     if tipo_filtro:
-        cursor.execute(
-            "SELECT * FROM producto WHERE tipo_articulo = ?",
-            (tipo_filtro,)
-        )
-    else:
-        cursor.execute("SELECT * FROM producto")
+        condiciones.append("tipo_articulo = ?")
+        parametros.append(tipo_filtro)
+    if genero:
+        condiciones.append("genero = ?")
+        parametros.append(genero)
+    if edad is not None:
+        condiciones.extend((
+            "(edad_minima IS NOT NULL OR edad_maxima IS NOT NULL)",
+            "(edad_minima IS NULL OR edad_minima <= ?)",
+            "(edad_maxima IS NULL OR edad_maxima >= ?)",
+        ))
+        parametros.extend((edad, edad))
 
-    productos = cursor.fetchall()
+    consulta = "SELECT * FROM producto"
+    if condiciones:
+        consulta += " WHERE " + " AND ".join(condiciones)
+
+    conn = get_conexion()
+    productos = conn.execute(consulta, parametros).fetchall()
+    generos = conn.execute(
+        "SELECT DISTINCT genero FROM producto WHERE tipo_articulo = 'Libro' ORDER BY genero COLLATE NOCASE"
+    ).fetchall()
     conn.close()
 
     return render_template(
         "productos/lista.html",
         productos=productos,
-        categoria_actual=categoria_param
+        categoria_actual=categoria_param,
+        edad=edad_texto,
+        genero=genero,
+        generos=generos,
     )
 
 
@@ -125,8 +172,8 @@ def crear():
 
         cursor.execute("""
             INSERT INTO producto
-            (nombre, autor, tipo_articulo, genero, idioma, anio, precio, stock)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (nombre, autor, tipo_articulo, genero, idioma, anio, precio, stock, edad_minima, edad_maxima)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, datos)
 
         conn.commit()
@@ -185,7 +232,9 @@ def editar(id_producto):
                 idioma = ?,
                 anio = ?,
                 precio = ?,
-                stock = ?
+                stock = ?,
+                edad_minima = ?,
+                edad_maxima = ?
             WHERE id_producto = ?
         """, datos + (id_producto,))
 

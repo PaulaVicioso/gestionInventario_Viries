@@ -21,6 +21,7 @@ Stock la cantidad'''
 def create_tables():
     conn = get_conexion()
     cursor = conn.cursor()
+    cursor.execute("BEGIN IMMEDIATE")
 
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS producto (
@@ -58,6 +59,11 @@ def create_tables():
             FOREIGN KEY (id_producto) REFERENCES producto (id_producto)
         )
     """)
+
+    columnas_producto = {columna["name"] for columna in cursor.execute("PRAGMA table_info(producto)")}
+    for columna in ("edad_minima", "edad_maxima"):
+        if columna not in columnas_producto:
+            cursor.execute(f"ALTER TABLE producto ADD COLUMN {columna} INTEGER")
 
     existente = cursor.execute("SELECT COUNT(*) AS total FROM producto").fetchone()
     if existente["total"] == 0:
