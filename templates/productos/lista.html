@@ -120,7 +120,13 @@
                                 —
                             {% endif %}
                         </td>
-                        <td>{{ p.stock }}</td>
+                        <td>
+                            {% if p.stock <= 0 %}
+                                <span class="badge rounded-pill text-bg-warning">Sin stock</span>
+                            {% else %}
+                                <span class="fw-semibold">{{ p.stock }}</span>
+                            {% endif %}
+                        </td>
 
                         <td class="text-success fw-bold">
                             ${{ "%.2f"|format(p.precio) }}
@@ -138,6 +144,17 @@
                                         Comprar
                                     </button>
                                 </form>
+
+                                {% if p.tipo_articulo == "Libro" and p.stock == 0 %}
+                                    {% if session.get("usuario_id") %}
+                                        <form method="post"
+                                              action="{{ url_for('productos.reservar', id_producto=p.id_producto, categoria=categoria_actual, edad=edad, genero=genero) }}">
+                                            <button type="submit" class="btn btn-primary btn-sm">Reservar</button>
+                                        </form>
+                                    {% else %}
+                                        <a href="{{ url_for('login') }}" class="btn btn-outline-primary btn-sm">Iniciá sesión para reservar</a>
+                                    {% endif %}
+                                {% endif %}
 
                                 {% if session.get("rol_id") == 1 %}
 

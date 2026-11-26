@@ -65,6 +65,15 @@ def create_tables():
         if columna not in columnas_producto:
             cursor.execute(f"ALTER TABLE producto ADD COLUMN {columna} INTEGER")
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS reserva (
+            usuario_id INTEGER NOT NULL REFERENCES usuario(id),
+            id_producto INTEGER NOT NULL REFERENCES producto(id_producto),
+            fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (usuario_id, id_producto)
+        )
+    """)
+
     existente = cursor.execute("SELECT COUNT(*) AS total FROM producto").fetchone()
     if existente["total"] == 0:
         cursor.execute("""

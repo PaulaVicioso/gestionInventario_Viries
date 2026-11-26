@@ -148,6 +148,43 @@ def listaProductos():
     )
 
 
+@bp_productos.route("/reservar/<int:id_producto>", methods=["POST"])
+def reservar(id_producto):
+    usuario_id = session.get("usuario_id")
+    if usuario_id is None:
+        flash("Iniciá sesión para reservar un libro.", "warning")
+        return redirect(url_for("login"))
+
+    conn = get_conexion()
+    try:
+        with conn:
+            resultado = conn.execute("""
+                INSERT INTO reserva (usuario_id, id_producto)
+                SELECT u.id, p.id_producto
+                FROM usuario u CROSS JOIN producto p
+                WHERE u.id = ? AND p.id_producto = ?
+                    AND p.tipo_articulo = 'Libro' AND p.stock = 0
+                ON CONFLICT(usuario_id, id_producto) DO NOTHING
+            """, (usuario_id, id_producto))
+            reservada = resultado.rowcount == 1
+            existente = conn.execute(
+                "SELECT 1 FROM reserva WHERE usuario_id = ? AND id_producto = ?",
+                (usuario_id, id_producto),
+            ).fetchone()
+    finally:
+        conn.close()
+
+    if reservada:
+        flash("Reserva confirmada.", "success")
+    elif existente:
+        flash("Ya tenés una reserva para este libro.", "info")
+    else:
+        flash("Solo se pueden reservar libros sin stock.", "warning")
+
+    filtros = {clave: request.args[clave] for clave in ("categoria", "edad", "genero") if clave in request.args}
+    return redirect(url_for("productos.listaProductos", **filtros))
+
+
 # ALTA DE PRODUCTOS
 @bp_productos.route("/nuevo", methods=["GET", "POST"])
 def crear():
@@ -264,6 +301,7 @@ def eliminar(id_producto):
     conn = get_conexion()
     cursor = conn.cursor()
 
+    cursor.execute("DELETE FROM reserva WHERE id_producto = ?", (id_producto,))
     cursor.execute(
         "DELETE FROM producto WHERE id_producto = ?",
         (id_producto,)
