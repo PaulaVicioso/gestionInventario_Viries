@@ -1,5 +1,7 @@
 from flask import abort, render_template, Blueprint, redirect, url_for, flash, request, session
-from db import get_conexion
+from sqlalchemy import select, update
+
+from db import Compra, Producto, Usuario, abrir_sesion
 #Acá nostoros vamos a crear el BLUEPRINT
 bp_carrito = Blueprint("carrito", __name__, url_prefix="/carrito")
 
@@ -16,17 +18,15 @@ def requerir_sesion():
 
 @bp_carrito.route("/")
 def visualizarCarrito():
-    conn = get_conexion()
-    try:
-        compras = conn.execute("""
-            SELECT c.id, c.id_producto, c.cantidad, c.total, c.estado, p.nombre AS titulo
-            FROM compra c
-            LEFT JOIN producto p ON p.id_producto = c.id_producto
-            WHERE c.usuario_id = ?
-            ORDER BY c.id DESC
-        """, (session["usuario_id"],)).fetchall()
-    finally:
-        conn.close()
+    consulta = (
+        select(Compra.id, Compra.id_producto, Compra.cantidad, Compra.total,
+               Compra.estado, Producto.nombre.label("titulo"))
+        .outerjoin(Producto, Producto.id_producto == Compra.id_producto)
+        .where(Compra.usuario_id == session["usuario_id"])
+        .order_by(Compra.id.desc())
+    )
+    with abrir_sesion() as datos:
+        compras = datos.execute(consulta).all()
     return render_template("compra-lista.html", compras=compras, ventas=False)
 
 
@@ -35,18 +35,15 @@ def listar_ventas():
     if session.get("rol_id") != 1:
         abort(403)
 
-    conn = get_conexion()
-    try:
-        compras = conn.execute("""
-            SELECT c.id, c.id_producto, c.cantidad, c.total, c.estado, p.nombre AS titulo,
-                   u.nombre, u.apellido, u.email
-            FROM compra c
-            LEFT JOIN producto p ON p.id_producto = c.id_producto
-            LEFT JOIN usuario u ON u.id = c.usuario_id
-            ORDER BY c.id DESC
-        """).fetchall()
-    finally:
-        conn.close()
+    consulta = (
+        select(Compra.id, Compra.id_producto, Compra.cantidad, Compra.total, Compra.estado,
+               Producto.nombre.label("titulo"), Usuario.nombre, Usuario.apellido, Usuario.email)
+        .outerjoin(Producto, Producto.id_producto == Compra.id_producto)
+        .outerjoin(Usuario, Usuario.id == Compra.usuario_id)
+        .order_by(Compra.id.desc())
+    )
+    with abrir_sesion() as datos:
+        compras = datos.execute(consulta).all()
     return render_template("compra-lista.html", compras=compras, ventas=True)
 
 
@@ -58,31 +55,24 @@ def agregar(id_producto):
 
 @bp_carrito.route("/comprar/<int:id_producto>", methods=["POST"])
 def comprar_ahora(id_producto):
-    conn = get_conexion()
-    try:
-        with conn:
-            conn.execute("BEGIN IMMEDIATE")
-            producto = conn.execute(
-                "SELECT * FROM producto WHERE id_producto = ?", (id_producto,)
-            ).fetchone()
+    with abrir_sesion() as datos, datos.begin():
+        descontadas = datos.execute(
+            update(Producto).where(Producto.id_producto == id_producto, Producto.stock > 0)
+            .values(stock=Producto.stock - 1)
+        ).rowcount
+        producto = datos.get(Producto, id_producto)
 
-            if not producto:
-                flash("El artículo seleccionado no existe.", "danger")
-                return redirect(url_for("productos.listaProductos"))
+        if producto is None:
+            flash("El artículo seleccionado no existe.", "danger")
+            return redirect(url_for("productos.listaProductos"))
+        if not descontadas:
+            flash("No hay stock disponible para este artículo.", "warning")
+            return redirect(url_for("productos.listaProductos"))
 
-            if producto["stock"] <= 0:
-                flash("No hay stock disponible para este artículo.", "warning")
-                return redirect(url_for("productos.listaProductos"))
+        datos.add(Compra(
+            id_producto=id_producto, cantidad=1, total=producto.precio,
+            estado="CONFIRMADA", usuario_id=session["usuario_id"],
+        ))
 
-            conn.execute(
-                "UPDATE producto SET stock = stock - 1 WHERE id_producto = ?", (id_producto,)
-            )
-            conn.execute("""
-                INSERT INTO compra (id_producto, cantidad, total, estado, usuario_id)
-                VALUES (?, ?, ?, ?, ?)
-            """, (id_producto, 1, producto["precio"], "CONFIRMADA", session["usuario_id"]))
-    finally:
-        conn.close()
-
-    flash(f"¡Compra exitosa! Adquiriste '{producto['nombre']}'.", "success")
+    flash(f"¡Compra exitosa! Adquiriste '{producto.nombre}'.", "success")
     return redirect(url_for("carrito.visualizarCarrito"))

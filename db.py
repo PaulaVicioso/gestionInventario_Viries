@@ -3,12 +3,16 @@
 # Podemos usar APIS ajenas de otros lados. Pero no reemplazar contenido que vimos nosotros en clase.
 # No usar SQL myAdmin
 
-import sqlite3
+from pathlib import Path
 
-def get_conexion():
-    conn = sqlite3.connect("libreria.db")    
-    conn.row_factory = sqlite3.Row    
-    return conn
+from flask import current_app
+from sqlalchemy import Float, ForeignKey, Integer, Text, URL, create_engine, func, inspect, select, text
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+
+
+class Base(DeclarativeBase):
+    pass
+
 
 '''NOmbre de del libro y del autor.
 Tipo es uno de estos 3 artículos: Libro, Música y Película.
@@ -18,75 +22,86 @@ Año en el que salió el artículo. Evitar la Ñ.
 Precio en pesos
 Stock la cantidad'''
 
-def create_tables():
-    conn = get_conexion()
-    cursor = conn.cursor()
-    cursor.execute("BEGIN IMMEDIATE")
+class Producto(Base):
+    __tablename__ = "producto"
+    __table_args__ = {"sqlite_autoincrement": True}
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS producto (
-            id_producto INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            autor TEXT NOT NULL,
-            tipo_articulo TEXT NOT NULL,
-            genero TEXT NOT NULL,
-            idioma TEXT NOT NULL,
-            anio INTEGER NOT NULL,
-            precio REAL NOT NULL,
-            stock INTEGER NOT NULL
-        )
-    """)
+    id_producto: Mapped[int] = mapped_column(primary_key=True)
+    nombre: Mapped[str] = mapped_column(Text)
+    autor: Mapped[str] = mapped_column(Text)
+    tipo_articulo: Mapped[str] = mapped_column(Text)
+    genero: Mapped[str] = mapped_column(Text)
+    idioma: Mapped[str] = mapped_column(Text)
+    anio: Mapped[int]
+    precio: Mapped[float] = mapped_column(Float)
+    stock: Mapped[int]
+    edad_minima: Mapped[int | None]
+    edad_maxima: Mapped[int | None]
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS usuario (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nombre TEXT NOT NULL,
-            apellido TEXT NOT NULL,
-            email TEXT NOT NULL UNIQUE,
-            password_hash TEXT NOT NULL,
-            rol_id INTEGER NOT NULL,
-            medio TEXT NOT NULL
-        )
-    """)
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS compra (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            id_producto INTEGER NOT NULL,
-            cantidad INTEGER NOT NULL DEFAULT 1,
-            total REAL NOT NULL,
-            estado TEXT NOT NULL DEFAULT 'CONFIRMADA',
-            FOREIGN KEY (id_producto) REFERENCES producto (id_producto)
-        )
-    """)
+class Usuario(Base):
+    __tablename__ = "usuario"
+    __table_args__ = {"sqlite_autoincrement": True}
 
-    columnas_compra = {columna["name"] for columna in cursor.execute("PRAGMA table_info(compra)")}
-    if "usuario_id" not in columnas_compra:
-        cursor.execute("ALTER TABLE compra ADD COLUMN usuario_id INTEGER REFERENCES usuario(id)")
+    id: Mapped[int] = mapped_column(primary_key=True)
+    nombre: Mapped[str] = mapped_column(Text)
+    apellido: Mapped[str] = mapped_column(Text)
+    email: Mapped[str] = mapped_column(Text, unique=True)
+    password_hash: Mapped[str] = mapped_column(Text)
+    rol_id: Mapped[int]
+    medio: Mapped[str] = mapped_column(Text)
 
-    columnas_producto = {columna["name"] for columna in cursor.execute("PRAGMA table_info(producto)")}
-    for columna in ("edad_minima", "edad_maxima"):
-        if columna not in columnas_producto:
-            cursor.execute(f"ALTER TABLE producto ADD COLUMN {columna} INTEGER")
 
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS reserva (
-            usuario_id INTEGER NOT NULL REFERENCES usuario(id),
-            id_producto INTEGER NOT NULL REFERENCES producto(id_producto),
-            fecha_creacion TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (usuario_id, id_producto)
-        )
-    """)
+class Compra(Base):
+    __tablename__ = "compra"
+    __table_args__ = {"sqlite_autoincrement": True}
 
-    existente = cursor.execute("SELECT COUNT(*) AS total FROM producto").fetchone()
-    if existente["total"] == 0:
-        cursor.execute("""
-            INSERT INTO producto (nombre, autor, tipo_articulo, genero, idioma, anio, precio, stock)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, ("Harry Potter", "JK Rowling", "Libro", "Fantasía juvenil", "Inglés", 1997, 53500.00, 7))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    id_producto: Mapped[int] = mapped_column(ForeignKey("producto.id_producto"))
+    cantidad: Mapped[int] = mapped_column(Integer, server_default=text("1"))
+    total: Mapped[float] = mapped_column(Float)
+    estado: Mapped[str] = mapped_column(Text, server_default="CONFIRMADA")
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"))
 
-    conn.commit()
-    conn.close()
 
-if __name__ == "__main__":
-    create_tables()
+class Reserva(Base):
+    __tablename__ = "reserva"
+
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id"), primary_key=True)
+    id_producto: Mapped[int] = mapped_column(ForeignKey("producto.id_producto"), primary_key=True)
+    fecha_creacion: Mapped[str] = mapped_column(Text, server_default=func.current_timestamp())
+
+
+def init_db(app):
+    ruta = Path(app.config["DATABASE_PATH"]).expanduser().resolve()
+    engine = create_engine(URL.create("sqlite", database=str(ruta)))
+    app.extensions["viries_db"] = sessionmaker(engine, expire_on_commit=False)
+
+    with engine.begin() as conexion:
+        # Serializa el arranque si dos procesos inicializan la misma base.
+        conexion.exec_driver_sql("BEGIN IMMEDIATE")
+        Base.metadata.create_all(conexion)
+        inspector = inspect(conexion)
+        columnas_compra = {columna["name"] for columna in inspector.get_columns("compra")}
+        if "usuario_id" not in columnas_compra:
+            conexion.exec_driver_sql("ALTER TABLE compra ADD COLUMN usuario_id INTEGER REFERENCES usuario(id)")
+        columnas_producto = {columna["name"] for columna in inspector.get_columns("producto")}
+        for columna in ("edad_minima", "edad_maxima"):
+            if columna not in columnas_producto:
+                conexion.exec_driver_sql(f"ALTER TABLE producto ADD COLUMN {columna} INTEGER")
+
+        with Session(conexion) as datos:
+            if datos.scalar(select(Producto.id_producto).limit(1)) is None:
+                datos.add(Producto(
+                    nombre="Harry Potter", autor="JK Rowling", tipo_articulo="Libro",
+                    genero="Fantasía juvenil", idioma="Inglés", anio=1997, precio=53500.00, stock=7,
+                ))
+                datos.flush()
+
+
+def abrir_sesion():
+    return current_app.extensions["viries_db"]()
+
+
+def buscar_usuario_por_email(datos, email):
+    return datos.scalar(select(Usuario).where(func.lower(Usuario.email) == func.lower(email)))

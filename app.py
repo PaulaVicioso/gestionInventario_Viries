@@ -4,17 +4,17 @@ from productos import bp_productos
 from carrito import bp_carrito
 from usuarios import bp_usuarios
 from werkzeug.security import check_password_hash
-from db import create_tables, get_conexion
+from db import abrir_sesion, buscar_usuario_por_email, init_db
 
 app = Flask(__name__)
+app.config["DATABASE_PATH"] = os.environ.get("VIRIES_DB_PATH") or os.path.join(app.root_path, "libreria.db")
 app.secret_key = os.environ.get("SECRET_KEY", "dev-libreria-cambiar")
 
 app.register_blueprint(bp_productos)
 app.register_blueprint(bp_carrito)
 app.register_blueprint(bp_usuarios)
 
-with app.app_context():
-    create_tables()
+init_db(app)
 
 #Chicos, crear carpetas más tarde \(°A°)/
 # y copiar los HTML de Librería de la materia Programación Avanzada → Hecho. Oh yeah
@@ -40,18 +40,14 @@ def login():
         email = request.form.get("username", "").strip()
         password = request.form.get("password", "").strip()
 
-        conn = get_conexion()
-        usuario = conn.execute(
-            "SELECT * FROM usuario WHERE LOWER(email) = LOWER(?)",
-            (email,),
-        ).fetchone()
-        conn.close()
+        with abrir_sesion() as datos:
+            usuario = buscar_usuario_por_email(datos, email)
 
-        if usuario and check_password_hash(usuario["password_hash"], password):
-            session["usuario_id"] = usuario["id"]
-            session["usuario_nombre"] = usuario["nombre"]
-            session["rol_id"] = usuario["rol_id"]
-            flash(f"¡Bienvenido, {usuario['nombre']}!", "success")
+        if usuario and check_password_hash(usuario.password_hash, password):
+            session["usuario_id"] = usuario.id
+            session["usuario_nombre"] = usuario.nombre
+            session["rol_id"] = usuario.rol_id
+            flash(f"¡Bienvenido, {usuario.nombre}!", "success")
             return redirect(url_for("productos.listaProductos"))
         else:
             flash("Email o contraseña incorrectos.", "danger")

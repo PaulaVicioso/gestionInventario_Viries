@@ -7,7 +7,10 @@
 # El otro rol es de Cliente que es más limitado.
 
 from flask import abort, render_template, Blueprint, request, redirect, url_for, flash, session
-from db import get_conexion
+from sqlalchemy import delete, func, literal_column, or_, select
+from sqlalchemy.dialects.sqlite import insert
+
+from db import Producto, Reserva, Usuario, abrir_sesion
 
 TIPOS_ARTICULO = ("Libro", "Música", "Película")
 
@@ -80,17 +83,17 @@ def validar_producto(formulario):
     if edad_minima is not None and edad_maxima is not None and edad_minima > edad_maxima:
         return None, "La edad mínima no puede superar la máxima."
 
-    datos = (
-        nombre,
-        autor,
-        tipo_articulo,
-        genero,
-        idioma,
-        anio,
-        precio,
-        stock,
-        edad_minima,
-        edad_maxima,
+    datos = dict(
+        nombre=nombre,
+        autor=autor,
+        tipo_articulo=tipo_articulo,
+        genero=genero,
+        idioma=idioma,
+        anio=anio,
+        precio=precio,
+        stock=stock,
+        edad_minima=edad_minima,
+        edad_maxima=edad_maxima,
     )
 
     return datos, None
@@ -111,35 +114,28 @@ def listaProductos():
         flash("Ingresá una edad entera y no negativa.", "warning")
         return redirect(url_for("productos.listaProductos", categoria=categoria_param, genero=genero))
 
-    condiciones = []
-    parametros = []
     if edad is not None or genero:
         tipo_filtro = "Libro"
         categoria_param = "lectura"
+
+    consulta = select(Producto).order_by(Producto.id_producto)
     if tipo_filtro:
-        condiciones.append("tipo_articulo = ?")
-        parametros.append(tipo_filtro)
+        consulta = consulta.where(Producto.tipo_articulo == tipo_filtro)
     if genero:
-        condiciones.append("genero = ?")
-        parametros.append(genero)
+        consulta = consulta.where(Producto.genero == genero)
     if edad is not None:
-        condiciones.extend((
-            "(edad_minima IS NOT NULL OR edad_maxima IS NOT NULL)",
-            "(edad_minima IS NULL OR edad_minima <= ?)",
-            "(edad_maxima IS NULL OR edad_maxima >= ?)",
-        ))
-        parametros.extend((edad, edad))
+        consulta = consulta.where(
+            or_(Producto.edad_minima.is_not(None), Producto.edad_maxima.is_not(None)),
+            or_(Producto.edad_minima.is_(None), Producto.edad_minima <= edad),
+            or_(Producto.edad_maxima.is_(None), Producto.edad_maxima >= edad),
+        )
 
-    consulta = "SELECT * FROM producto"
-    if condiciones:
-        consulta += " WHERE " + " AND ".join(condiciones)
-
-    conn = get_conexion()
-    productos = conn.execute(consulta, parametros).fetchall()
-    generos = conn.execute(
-        "SELECT DISTINCT genero FROM producto WHERE tipo_articulo = 'Libro' ORDER BY genero COLLATE NOCASE"
-    ).fetchall()
-    conn.close()
+    with abrir_sesion() as datos:
+        productos = datos.scalars(consulta).all()
+        generos = datos.execute(
+            select(Producto.genero).where(Producto.tipo_articulo == "Libro").distinct()
+            .order_by(Producto.genero.collate("NOCASE"))
+        ).all()
 
     return render_template(
         "productos/lista.html",
@@ -158,24 +154,19 @@ def reservar(id_producto):
         flash("Iniciá sesión para reservar un libro.", "warning")
         return redirect(url_for("login"))
 
-    conn = get_conexion()
-    try:
-        with conn:
-            resultado = conn.execute("""
-                INSERT INTO reserva (usuario_id, id_producto)
-                SELECT u.id, p.id_producto
-                FROM usuario u CROSS JOIN producto p
-                WHERE u.id = ? AND p.id_producto = ?
-                    AND p.tipo_articulo = 'Libro' AND p.stock = 0
-                ON CONFLICT(usuario_id, id_producto) DO NOTHING
-            """, (usuario_id, id_producto))
-            reservada = resultado.rowcount == 1
-            existente = conn.execute(
-                "SELECT 1 FROM reserva WHERE usuario_id = ? AND id_producto = ?",
-                (usuario_id, id_producto),
-            ).fetchone()
-    finally:
-        conn.close()
+    elegible = (
+        select(Usuario.id, Producto.id_producto)
+        .select_from(Usuario)
+        .join(Producto, Producto.id_producto == id_producto)
+        .where(Usuario.id == usuario_id, Producto.tipo_articulo == "Libro", Producto.stock == 0)
+    )
+    solicitud = (
+        insert(Reserva).from_select(["usuario_id", "id_producto"], elegible)
+        .on_conflict_do_nothing(index_elements=[Reserva.usuario_id, Reserva.id_producto])
+    )
+    with abrir_sesion() as datos, datos.begin():
+        reservada = datos.execute(solicitud).rowcount == 1
+        existente = reservada or datos.get(Reserva, (usuario_id, id_producto)) is not None
 
     if reservada:
         flash("Reserva confirmada.", "success")
@@ -194,17 +185,13 @@ def mis_reservas():
     if usuario_id is None:
         return redirect(url_for("login"))
 
-    conn = get_conexion()
-    try:
-        reservas = conn.execute("""
-            SELECT p.nombre AS libro, r.id_producto, r.fecha_creacion
-            FROM reserva r
-            JOIN producto p ON p.id_producto = r.id_producto
-            WHERE r.usuario_id = ?
-            ORDER BY r.fecha_creacion, r.rowid
-        """, (usuario_id,)).fetchall()
-    finally:
-        conn.close()
+    with abrir_sesion() as datos:
+        reservas = datos.execute(
+            select(Producto.nombre.label("libro"), Reserva.id_producto, Reserva.fecha_creacion)
+            .join(Producto, Producto.id_producto == Reserva.id_producto)
+            .where(Reserva.usuario_id == usuario_id)
+            .order_by(Reserva.fecha_creacion, literal_column("reserva.rowid"))
+        ).all()
     return render_template("productos/reservas.html", reservas=reservas, administracion=False)
 
 
@@ -214,14 +201,10 @@ def cancelar_reserva(id_producto):
     if usuario_id is None:
         return redirect(url_for("login"))
 
-    conn = get_conexion()
-    try:
-        with conn:
-            canceladas = conn.execute("""
-                DELETE FROM reserva WHERE usuario_id = ? AND id_producto = ?
-            """, (usuario_id, id_producto)).rowcount
-    finally:
-        conn.close()
+    with abrir_sesion() as datos, datos.begin():
+        canceladas = datos.execute(
+            delete(Reserva).where(Reserva.usuario_id == usuario_id, Reserva.id_producto == id_producto)
+        ).rowcount
 
     if canceladas:
         flash("Reserva cancelada.", "success")
@@ -237,18 +220,18 @@ def listar_reservas():
     if not es_administrador():
         abort(403)
 
-    conn = get_conexion()
-    try:
-        reservas = conn.execute("""
-            SELECT p.nombre AS libro, u.nombre, u.apellido, u.email, r.fecha_creacion,
-                   COUNT(*) OVER (PARTITION BY r.id_producto) AS pendientes
-            FROM reserva r
-            JOIN producto p ON p.id_producto = r.id_producto
-            JOIN usuario u ON u.id = r.usuario_id
-            ORDER BY r.fecha_creacion, r.rowid
-        """).fetchall()
-    finally:
-        conn.close()
+    with abrir_sesion() as datos:
+        reservas = datos.execute(
+            select(
+                Producto.nombre.label("libro"), Usuario.nombre, Usuario.apellido,
+                Usuario.email, Reserva.fecha_creacion,
+                func.count().over(partition_by=Reserva.id_producto).label("pendientes"),
+            )
+            .select_from(Reserva)
+            .join(Producto, Producto.id_producto == Reserva.id_producto)
+            .join(Usuario, Usuario.id == Reserva.usuario_id)
+            .order_by(Reserva.fecha_creacion, literal_column("reserva.rowid"))
+        ).all()
     return render_template("productos/reservas.html", reservas=reservas, administracion=True)
 
 
@@ -271,17 +254,8 @@ def crear():
             flash(error, "danger")
             return render_template("productos/crear.html"), 400
 
-        conn = get_conexion()
-        cursor = conn.cursor()
-
-        cursor.execute("""
-            INSERT INTO producto
-            (nombre, autor, tipo_articulo, genero, idioma, anio, precio, stock, edad_minima, edad_maxima)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        """, datos)
-
-        conn.commit()
-        conn.close()
+        with abrir_sesion() as db, db.begin():
+            db.add(Producto(**datos))
 
         flash("Producto registrado correctamente.", "success")
         return redirect(url_for("productos.listaProductos"))
@@ -300,60 +274,26 @@ def editar(id_producto):
         )
         return redirect(url_for("productos.listaProductos"))
 
-    conn = get_conexion()
-    cursor = conn.cursor()
+    with abrir_sesion() as db, db.begin():
+        producto = db.get(Producto, id_producto)
+        if producto is None:
+            flash("El producto que intentás editar no existe.", "danger")
+            return redirect(url_for("productos.listaProductos"))
 
-    cursor.execute(
-        "SELECT * FROM producto WHERE id_producto = ?",
-        (id_producto,)
-    )
+        if request.method == "POST":
+            datos, error = validar_producto(request.form)
+            if error:
+                flash(error, "danger")
+                return render_template("productos/editar.html", producto=producto), 400
 
-    producto = cursor.fetchone()
-
-    if producto is None:
-        conn.close()
-        flash("El producto que intentás editar no existe.", "danger")
-        return redirect(url_for("productos.listaProductos"))
+            for campo, valor in datos.items():
+                setattr(producto, campo, valor)
 
     if request.method == "POST":
-
-        datos, error = validar_producto(request.form)
-
-        if error:
-            conn.close()
-            flash(error, "danger")
-            return render_template(
-                "productos/editar.html",
-                producto=producto
-            ), 400
-
-        cursor.execute("""
-            UPDATE producto
-            SET nombre = ?,
-                autor = ?,
-                tipo_articulo = ?,
-                genero = ?,
-                idioma = ?,
-                anio = ?,
-                precio = ?,
-                stock = ?,
-                edad_minima = ?,
-                edad_maxima = ?
-            WHERE id_producto = ?
-        """, datos + (id_producto,))
-
-        conn.commit()
-        conn.close()
-
         flash("Producto modificado correctamente.", "success")
         return redirect(url_for("productos.listaProductos"))
+    return render_template("productos/editar.html", producto=producto)
 
-    conn.close()
-
-    return render_template(
-        "productos/editar.html",
-        producto=producto
-    )
 
 @bp_productos.route("/eliminar/<int:id_producto>", methods=["POST"])
 def eliminar(id_producto):
@@ -365,19 +305,9 @@ def eliminar(id_producto):
         )
         return redirect(url_for("productos.listaProductos"))
 
-    conn = get_conexion()
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM reserva WHERE id_producto = ?", (id_producto,))
-    cursor.execute(
-        "DELETE FROM producto WHERE id_producto = ?",
-        (id_producto,)
-    )
-
-    eliminado = cursor.rowcount
-
-    conn.commit()
-    conn.close()
+    with abrir_sesion() as db, db.begin():
+        db.execute(delete(Reserva).where(Reserva.id_producto == id_producto))
+        eliminado = db.execute(delete(Producto).where(Producto.id_producto == id_producto)).rowcount
 
     if eliminado:
         flash("Producto dado de baja correctamente.", "success")
