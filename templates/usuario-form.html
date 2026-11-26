@@ -27,7 +27,7 @@
         <h2 class="alert alert-warning">Crear Usuario</h2>
         <h3>También se puede Editar al Usuario ya existente</h3>
             
-        <form action="{{url_for('guardar_usuario') }}" method="post">
+        <form action="{{url_for('usuarios.guardar_usuario') }}" method="post">
         <input type="hidden" name="id" value="{{usuario.id if usuario else '' }}"/>
         
             <div class="mb-3">

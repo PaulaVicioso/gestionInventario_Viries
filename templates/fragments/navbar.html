@@ -34,7 +34,7 @@ CLIENTE puede ver, comprar con o sin promociones.
                 <span class="text-white small me-1">Hola, {{ session.get("usuario_nombre") }}</span>
                 <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm text-warning fw-semibold">Cerrar sesión</a>
             {% else %}
-                <a href="{{ url_for('nuevo_usuario') }}" class="btn btn-warning btn-sm text-dark fw-semibold">Registrate</a>
+                <a href="{{ url_for('usuarios.nuevo_usuario') }}" class="btn btn-warning btn-sm text-dark fw-semibold">Registrate</a>
             {% endif %}
         </section>
     </div>

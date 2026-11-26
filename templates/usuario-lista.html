@@ -20,7 +20,7 @@
             <div class="d-flex gap-2">
                 <a th:href="@{{ url_for('lista_roles')}}" class="btn btn-info text-black shadow-sm">Roles</a>
                 <a th:href="@{/permisos}" class="btn btn-success shadow-sm">Permisos</a>
-                <a th:href="@{{ url_for('nuevo_usuario', id=u.id)}}" class="btn btn-warning shadow-sm">Alta Usuario</a>
+                <a href="{{ url_for('usuarios.nuevo_usuario') }}" class="btn btn-warning shadow-sm">Alta Usuario</a>
             </div>
         </div>
 
@@ -48,7 +48,7 @@
                         </td>
                         <td class="text-center">
                             <div>
-                                <a th:href="@{{ url_for('editar_usuario', id=u.id)}}" class="btn btn-primary text-white">Editar</a>
+                                <a href="{{ url_for('usuarios.editar_usuario', usuario_id=u.id) }}" class="btn btn-primary text-white">Editar</a>
                                 <a th:href="@{/usuarios/eliminar/{id}(id=${u.id})}" class="btn btn-danger" 
                                 onclick="return confirm('¿Seguro que deseas eliminar este usuario?');">Eliminar</a>
                             </div>
