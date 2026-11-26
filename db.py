@@ -60,6 +60,10 @@ def create_tables():
         )
     """)
 
+    columnas_compra = {columna["name"] for columna in cursor.execute("PRAGMA table_info(compra)")}
+    if "usuario_id" not in columnas_compra:
+        cursor.execute("ALTER TABLE compra ADD COLUMN usuario_id INTEGER REFERENCES usuario(id)")
+
     columnas_producto = {columna["name"] for columna in cursor.execute("PRAGMA table_info(producto)")}
     for columna in ("edad_minima", "edad_maxima"):
         if columna not in columnas_producto:

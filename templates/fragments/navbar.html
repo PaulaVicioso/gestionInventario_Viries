@@ -20,7 +20,7 @@ CLIENTE puede ver, comprar con o sin promociones.
                 </li>
                 {% if session.get('usuario_id') %}
                 <li class="nav-item">
-                    <a class="nav-link" href="{{ url_for('carrito.visualizarCarrito') }}">Compras</a>
+                    <a class="nav-link" href="{{ url_for('carrito.visualizarCarrito') }}">Mis compras</a>
                 </li>
                 {% endif %}
                 {% if not session.get("usuario_id") %}
@@ -37,6 +37,7 @@ CLIENTE puede ver, comprar con o sin promociones.
                 <a href="{{ url_for('usuarios.mi_perfil') }}" class="btn btn-outline-light btn-sm">Mi perfil</a>
                 <a href="{{ url_for('productos.mis_reservas') }}" class="btn btn-outline-light btn-sm">Mis reservas</a>
                 {% if session.get('rol_id') == 1 %}
+                    <a href="{{ url_for('carrito.listar_ventas') }}" class="btn btn-outline-light btn-sm">Ventas</a>
                     <a href="{{ url_for('productos.listar_reservas') }}" class="btn btn-outline-light btn-sm">Reservas</a>
                 {% endif %}
                 <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm text-warning fw-semibold">Cerrar sesión</a>
