@@ -8,6 +8,8 @@ from db import abrir_sesion, buscar_usuario_por_email, init_db
 
 app = Flask(__name__)
 app.config["DATABASE_PATH"] = os.environ.get("VIRIES_DB_PATH") or os.path.join(app.root_path, "libreria.db")
+app.config["VIRIES_ADMIN_EMAIL"] = os.environ.get("VIRIES_ADMIN_EMAIL", "")
+app.config["VIRIES_ADMIN_PASSWORD"] = os.environ.get("VIRIES_ADMIN_PASSWORD", "")
 app.secret_key = os.environ.get("SECRET_KEY", "dev-libreria-cambiar")
 
 app.register_blueprint(bp_productos)

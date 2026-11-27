@@ -8,6 +8,7 @@ from pathlib import Path
 from flask import current_app
 from sqlalchemy import Float, ForeignKey, Integer, Text, URL, create_engine, func, inspect, select, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+from werkzeug.security import generate_password_hash
 
 
 class Base(DeclarativeBase):
@@ -96,7 +97,27 @@ def init_db(app):
                     nombre="Harry Potter", autor="JK Rowling", tipo_articulo="Libro",
                     genero="Fantasía juvenil", idioma="Inglés", anio=1997, precio=53500.00, stock=7,
                 ))
-                datos.flush()
+            crear_administrador_inicial(app, datos)
+            datos.flush()
+
+
+def crear_administrador_inicial(app, datos):
+    email = app.config.get("VIRIES_ADMIN_EMAIL", "").strip()
+    password = app.config.get("VIRIES_ADMIN_PASSWORD", "").strip()
+    if not email or not password:
+        return
+
+    if datos.scalar(select(Usuario.id).where(Usuario.rol_id == 1).limit(1)) is not None:
+        return
+
+    if buscar_usuario_por_email(datos, email) is not None:
+        app.logger.warning("No se creó el administrador inicial porque el correo ya está registrado.")
+        return
+
+    datos.add(Usuario(
+        nombre="Administrador", apellido="Viries", email=email,
+        password_hash=generate_password_hash(password), rol_id=1, medio="Sin especificar",
+    ))
 
 
 def abrir_sesion():
